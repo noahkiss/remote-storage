@@ -1,0 +1,39 @@
+FROM node:lts-bookworm AS base
+
+RUN npm install -g pnpm
+
+RUN apt-get update && apt-get install -y sqlite3
+
+WORKDIR /app
+
+COPY package*.json pnpm-lock.yaml* ./
+RUN pnpm install
+
+COPY . .
+
+RUN mkdir -p /app/data
+RUN touch /app/data/database.sqlite
+
+RUN pnpm run build
+RUN pnpm prune --prod && pnpm store prune
+
+# ---------------
+
+FROM node:lts-bookworm-slim AS production
+
+WORKDIR /app
+
+COPY --from=base /app/dist ./dist
+COPY --from=base /app/package*.json ./
+COPY --from=base /app/node_modules ./node_modules
+
+COPY --from=base /app/data/database.sqlite ./data/database.sqlite
+
+RUN chown -R 99:100 /app/data
+
+USER 99:100
+
+ENV NODE_ENV=production
+ENV DATA_STORE=sqlite
+
+CMD [ "node", "dist/main" ]
