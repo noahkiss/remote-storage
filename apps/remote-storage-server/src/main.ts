@@ -64,10 +64,10 @@ async function bootstrap() {
   await app.listen(port, '0.0.0.0')
 }
 
-if (process.env.NODE_ENV !== 'production') {
-  console.log('Running in single instance dev mode')
-  bootstrap()
-} else {
+if (process.env.CLUSTER_MODE === 'true') {
   console.log('Running in cluster mode')
   AppClusterService.clusterize(bootstrap)
+} else {
+  console.log('Running in single instance mode')
+  bootstrap()
 }

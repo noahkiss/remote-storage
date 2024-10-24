@@ -1,18 +1,35 @@
 import { Injectable, OnModuleInit } from '@nestjs/common'
 import { DataService } from '../data-service/data-service.interface'
+import { Database } from 'sqlite3'
+import * as fs from 'fs/promises'
+import * as path from 'path'
 
 @Injectable()
 export class SqliteService implements OnModuleInit, DataService {
   private db = null
-  private sqlite3 = require('sqlite3')
+  private initialized = false
+
   constructor() {}
 
   async onModuleInit() {
+    if (this.initialized || process.env.DATA_STORE !== 'sqlite') {
+      return
+    }
+
     try {
-      this.db = new this.sqlite3.Database('./database.sqlite')
+      const dbPath = './data/database.sqlite'
+      const dirPath = path.dirname(dbPath)
+
+      // Ensure the directory exists
+      await fs.mkdir(dirPath, { recursive: true })
+
+      this.db = new Database(dbPath)
       await this.db.run(
-        'CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT); CREATE INDEX IF NOT EXISTS key_index ON kv (key)'
+        `CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT);
+         CREATE INDEX IF NOT EXISTS key_index ON kv (key)`
       )
+
+      this.initialized = true
     } catch (e) {
       console.error('Failed to initialize sqlite database', e)
     }

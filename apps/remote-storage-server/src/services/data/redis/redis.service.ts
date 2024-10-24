@@ -5,10 +5,15 @@ import { DataService } from '../data-service/data-service.interface'
 @Injectable()
 export class RedisService implements OnModuleInit, DataService {
   private client: any
+  private initialized = false
 
   constructor() {}
 
   async onModuleInit() {
+    if (this.initialized || process.env.DATA_STORE === 'sqlite') {
+      return
+    }
+
     try {
       this.client = await createClient({
         url: process.env.REDIS_URL,
@@ -16,6 +21,8 @@ export class RedisService implements OnModuleInit, DataService {
       })
         .on('error', (err) => console.log('Redis Client Error', err))
         .connect()
+
+      this.initialized = true
     } catch (e) {
       console.log('Failed to connect to db', e)
     }
