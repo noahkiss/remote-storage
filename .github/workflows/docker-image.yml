@@ -1,0 +1,62 @@
+name: Create and publish Docker images
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*' # e.g. v1.0.0
+      - 'remote-storage@*' # e.g. remote-storage@1.0.0
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: apps/remote-storage-server
+          sparse-checkout-cone-mode: false
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=development,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=ref,event=tag  # Use the tag name as a tag for tag builds
+            type=semver,pattern={{version}}  # Generate semantic versioning tags for tag builds
+            type=sha # Just in case none of the above applies
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          file: apps/remote-storage-server/Dockerfile_sqlite_unraid
+          context: apps/remote-storage-server/.
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

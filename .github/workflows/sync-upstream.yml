@@ -1,0 +1,42 @@
+name: Rebase Upstream
+
+on:
+  push:
+    paths:
+      - .github/workflows/sync-upstream.yml
+  schedule:
+      # At 19:45 on Tuesdays
+    - cron: '45 19 * * 2'
+  workflow_dispatch:
+
+env:
+  TARGET_REPO: ${{ github.repository }}
+  SOURCE_REPO: FrigadeHQ/remote-storage
+  MAIN_BRANCH: main
+
+jobs:
+  rebase:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Rebase on Upstream Repo
+        run: |
+          TOKEN="${{ secrets.GITHUB_TOKEN }}"
+          SOURCE_URL="https://github.com/${{ env.SOURCE_REPO }}.git"
+          TARGET_URL="https://github.com/${{ env.TARGET_REPO }}.git"
+          TARGET_URL_AUTH="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ env.TARGET_REPO }}.git"
+
+          git clone "$TARGET_URL" target && cd target
+
+          git config user.name   "${GITHUB_ACTOR}"
+          git config user.email  "${GITHUB_ACTOR}@users.noreply.github.com"
+          git config --local user.password "$TOKEN"
+
+          git remote set-url origin "$TARGET_URL_AUTH"
+          git remote add upstream   "$SOURCE_URL"
+
+          git fetch upstream
+          git fetch --tags upstream
+          git rebase -Xtheirs upstream/${{ env.MAIN_BRANCH }}
+          git push origin ${{ env.MAIN_BRANCH }}
+          git push origin --tags
